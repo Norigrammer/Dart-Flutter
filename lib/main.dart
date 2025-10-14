@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app_router.dart';
+import 'firebase_options.dart';
 
 // TODO: flutterfire configure 実行後に生成されるファイル
 // import 'firebase_options.dart';
@@ -18,7 +19,9 @@ class BootstrapApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FutureBuilder(
-      future: Firebase.initializeApp(),
+      future: Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ),
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const MaterialApp(
@@ -60,4 +63,14 @@ class BootstrapApp extends ConsumerWidget {
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
 });
+
+// テスト互換用のラッパー（widget_test.dart が MyApp を参照しているため）
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ProviderScope(child: BootstrapApp());
+  }
+}
 
