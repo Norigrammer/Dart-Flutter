@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'pet.dart';
+import 'converters.dart';
 
 part 'care_log.freezed.dart';
 part 'care_log.g.dart';
@@ -7,7 +7,7 @@ part 'care_log.g.dart';
 enum CareLogType { walk, feed, clinic }
 
 @freezed
-class CareLog with _$CareLog {
+abstract class CareLog with _$CareLog {
   const factory CareLog({
     required String id,
     required String petId,
