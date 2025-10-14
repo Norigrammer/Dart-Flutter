@@ -7,25 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1008135108055:android:e752a2b6cd17fcef388792",
-        "android_client_info": {
-          "package_name": "com.example.sample"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDl5W81AKYJ4vVpqoBM7bBI5V75Byy_ZmU"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:1008135108055:android:e0477ae98bf1cffe388792",
         "android_client_info": {
           "package_name": "com.norigrammer.pettime"
