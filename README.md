@@ -1,16 +1,40 @@
-# sample
+# ペットケア記録（家族共有）
 
-A new Flutter project.
+Flutter + Firebase のスケルトン。Authゲート、ルーター、ページの雛形を含みます。
 
-## Getting Started
+## セットアップ
 
-This project is a starting point for a Flutter application.
+1) Firebase プロジェクトの紐付け
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+dart pub global activate flutterfire_cli
+flutterfire configure
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+これで `lib/firebase_options.dart` が生成されます。`main.dart` の TODO を解除して
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```dart
+await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+```
+
+を有効化してください。
+
+2) 依存解決と起動
+
+```powershell
+dart pub get
+flutter run
+```
+
+## ディレクトリ
+
+- `lib/pages/` サインイン・ホームのページ
+- `lib/features/auth/` 認証コントローラ
+- `lib/data/repositories/` Firestore連携のリポジトリ（スタブ）
+
+## TODO（今後）
+
+- Google/メール認証の実装
+- Firestore スキーマ: users/{uid}, pets/{petId}, pets/{petId}/logs/{logId}
+- 画像アップロード（Firebase Storage）
+- 通知（FCM）
