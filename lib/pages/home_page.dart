@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_controller.dart';
 import '../data/repositories/pet_repository.dart';
+import 'package:go_router/go_router.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -59,7 +60,7 @@ class HomePage extends ConsumerWidget {
                   title: Text(pet.name),
                   subtitle: Text('メンバー: ${pet.members.length}人'),
                   onTap: () {
-                    // TODO: ペット詳細 / ログ画面へ遷移（後続実装）
+                    context.push('/pets/${pet.id}', extra: pet);
                   },
                 );
               },
