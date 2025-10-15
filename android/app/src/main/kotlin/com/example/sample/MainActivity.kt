@@ -1,4 +1,4 @@
-package com.example.sample
+package com.norigrammer.pettime
 
 import io.flutter.embedding.android.FlutterActivity
 
