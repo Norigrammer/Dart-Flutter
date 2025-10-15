@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_controller.dart';
 import '../data/repositories/pet_repository.dart';
@@ -111,8 +113,34 @@ Future<void> _showAddPetDialog(BuildContext context, WidgetRef ref) async {
           if (!formKey.currentState!.validate()) return;
           setState(() => loading = true);
           try {
-            await repo.createPet(name: nameController.text.trim());
+            await repo
+                .createPet(name: nameController.text.trim())
+                .timeout(const Duration(seconds: 15));
             if (context.mounted) Navigator.of(context).pop();
+          } on TimeoutException {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('作成がタイムアウトしました。ネットワーク接続や Firestore が有効化されているか確認してください。')),
+            );
+            setState(() => loading = false);
+          } on FirebaseException catch (e) {
+            if (!context.mounted) return;
+            var msg = '作成に失敗しました: ${e.message ?? e.code}';
+            switch (e.code) {
+              case 'permission-denied':
+                msg = '作成に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                break;
+              case 'failed-precondition':
+                msg = '作成に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                break;
+              case 'unavailable':
+                msg = '作成に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                break;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(msg)),
+            );
+            setState(() => loading = false);
           } catch (e) {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
