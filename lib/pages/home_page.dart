@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_controller.dart';
@@ -161,6 +162,9 @@ Future<void> _showAddPetDialog(BuildContext context, WidgetRef ref) async {
                 labelText: '名前',
                 hintText: '例: ポチ',
               ),
+              autofillHints: const [AutofillHints.name],
+              enableSuggestions: false,
+              autocorrect: false,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return '名前を入力してください';
                 if (v.trim().length > 30) return '30文字以内で入力してください';

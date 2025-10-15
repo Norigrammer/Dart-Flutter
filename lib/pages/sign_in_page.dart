@@ -66,6 +66,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                     TextFormField(
                       controller: _emailCtrl,
                       decoration: const InputDecoration(labelText: 'メールアドレス'),
+                      autofillHints: const [AutofillHints.username, AutofillHints.email],
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) {
                         if (v == null || v.isEmpty) return '入力してください';
@@ -78,6 +79,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                       controller: _passwordCtrl,
                       decoration: const InputDecoration(labelText: 'パスワード'),
                       obscureText: true,
+                      autofillHints: const [AutofillHints.password],
                       validator: (v) {
                         if (v == null || v.isEmpty) return '入力してください';
                         if (v.length < 6) return '6文字以上にしてください';
