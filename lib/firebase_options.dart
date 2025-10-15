@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDl5W81AKYJ4vVpqoBM7bBI5V75Byy_ZmU',
-    appId: '1:1008135108055:android:e752a2b6cd17fcef388792',
+    appId: '1:1008135108055:android:e0477ae98bf1cffe388792',
     messagingSenderId: '1008135108055',
     projectId: 'pet-time-7398c',
     storageBucket: 'pet-time-7398c.firebasestorage.app',
@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1008135108055',
     projectId: 'pet-time-7398c',
     storageBucket: 'pet-time-7398c.firebasestorage.app',
-    iosBundleId: 'com.example.sample',
+    iosBundleId: 'com.norigrammer.pettime',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -72,7 +72,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1008135108055',
     projectId: 'pet-time-7398c',
     storageBucket: 'pet-time-7398c.firebasestorage.app',
-    iosBundleId: 'com.example.sample',
+    iosBundleId: 'com.norigrammer.pettime',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

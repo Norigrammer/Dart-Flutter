@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'pages/home_page.dart';
 import 'pages/sign_in_page.dart';
 import 'main.dart';
+import 'pages/pet_detail_page.dart';
+import 'models/pet.dart';
 
 final GoRouter appRouter = GoRouter(
   routes: <RouteBase>[
@@ -14,6 +16,16 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: 'home',
           builder: (BuildContext context, GoRouterState state) => const HomePage(),
+        ),
+        GoRoute(
+          path: 'pets/:id',
+          builder: (BuildContext context, GoRouterState state) {
+            final pet = state.extra as Pet?;
+            if (pet == null) {
+              return const Scaffold(body: Center(child: Text('ペット情報が見つかりません')));
+            }
+            return PetDetailPage(pet: pet);
+          },
         ),
         GoRoute(
           path: 'signin',
