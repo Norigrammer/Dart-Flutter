@@ -36,7 +36,22 @@ class PetDetailPage extends ConsumerWidget {
                       title: Text(_labelOf(log.type)),
                       subtitle: Text(_formatDateTime(log.at.toLocal()) + (log.note != null && log.note!.isNotEmpty ? "\n" + log.note! : "")),
                       isThreeLine: (log.note != null && log.note!.isNotEmpty),
-                      // onTap: () { // 編集などは後続で }
+                      trailing: PopupMenuButton<_LogAction>(
+                        onSelected: (action) async {
+                          switch (action) {
+                            case _LogAction.edit:
+                              await _showEditLogDialog(context, ref, pet.id, log);
+                              break;
+                            case _LogAction.delete:
+                              await _confirmDeleteLog(context, ref, pet.id, log);
+                              break;
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: _LogAction.edit, child: Text('編集')),
+                          PopupMenuItem(value: _LogAction.delete, child: Text('削除')),
+                        ],
+                      ),
                     );
                   },
                 );
@@ -264,4 +279,205 @@ String _labelOf(CareLogType type) {
     case CareLogType.clinic:
       return '病院';
   }
+}
+
+enum _LogAction { edit, delete }
+
+Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petId, CareLog log) async {
+  final formKey = GlobalKey<FormState>();
+  CareLogType? type = log.type;
+  DateTime at = log.at.toLocal();
+  final noteController = TextEditingController(text: log.note ?? '');
+  bool loading = false;
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      final repo = ref.read(careLogRepositoryProvider);
+      return StatefulBuilder(builder: (context, setState) {
+        Future<void> pickDateTime() async {
+          final date = await showDatePicker(
+            context: context,
+            initialDate: at,
+            firstDate: DateTime(2000),
+            lastDate: DateTime(2100),
+          );
+          if (date == null) return;
+          final time = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay.fromDateTime(at),
+          );
+          if (time == null) return;
+          setState(() {
+            at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+          });
+        }
+
+        Future<void> doUpdate() async {
+          if (!formKey.currentState!.validate() || type == null) return;
+          setState(() => loading = true);
+          try {
+            await repo
+                .updateLog(
+                  petId,
+                  log,
+                  type: type,
+                  at: at,
+                  note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                )
+                .timeout(const Duration(seconds: 15));
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          } on TimeoutException {
+            if (!dialogContext.mounted) return;
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              const SnackBar(content: Text('更新がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
+            );
+            setState(() => loading = false);
+          } on FirebaseException catch (e) {
+            if (!dialogContext.mounted) return;
+            var msg = '更新に失敗しました: ${e.message ?? e.code}';
+            switch (e.code) {
+              case 'permission-denied':
+                msg = '更新に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                break;
+              case 'failed-precondition':
+                msg = '更新に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                break;
+              case 'unavailable':
+                msg = '更新に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                break;
+            }
+            ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(msg)));
+            setState(() => loading = false);
+          } catch (e) {
+            if (!dialogContext.mounted) return;
+            ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('更新に失敗しました: $e')));
+            setState(() => loading = false);
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('ログを編集'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<CareLogType>(
+                  value: type,
+                  items: CareLogType.values
+                      .map((t) => DropdownMenuItem(value: t, child: Text(_labelOf(t))))
+                      .toList(),
+                  onChanged: loading ? null : (v) => setState(() => type = v),
+                  decoration: const InputDecoration(labelText: '種類'),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: loading ? null : pickDateTime,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: '日時'),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_formatDateTime(at)),
+                        const Icon(Icons.calendar_today, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: noteController,
+                  enabled: !loading,
+                  decoration: const InputDecoration(labelText: 'メモ（任意）'),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: loading ? null : doUpdate,
+              child: loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('保存'),
+            ),
+          ],
+        );
+      });
+    },
+  );
+}
+
+Future<void> _confirmDeleteLog(BuildContext context, WidgetRef ref, String petId, CareLog log) async {
+  bool loading = false;
+  final repo = ref.read(careLogRepositoryProvider);
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> doDelete() async {
+            setState(() => loading = true);
+            try {
+              await repo.deleteLog(petId, log).timeout(const Duration(seconds: 15));
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('ログを削除しました')),
+                );
+              }
+            } on TimeoutException {
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content: Text('削除がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
+              );
+              setState(() => loading = false);
+            } on FirebaseException catch (e) {
+              if (!dialogContext.mounted) return;
+              var msg = '削除に失敗しました: ${e.message ?? e.code}';
+              switch (e.code) {
+                case 'permission-denied':
+                  msg = '削除に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                  break;
+                case 'failed-precondition':
+                  msg = '削除に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                  break;
+                case 'unavailable':
+                  msg = '削除に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                  break;
+              }
+              ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(msg)));
+              setState(() => loading = false);
+            } catch (e) {
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('削除に失敗しました: $e')));
+              setState(() => loading = false);
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('ログを削除しますか？'),
+            content: const Text('この操作は取り消せません。'),
+            actions: [
+              TextButton(
+                onPressed: loading ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('キャンセル'),
+              ),
+              FilledButton.tonal(
+                onPressed: loading ? null : doDelete,
+                child: loading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('削除'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }

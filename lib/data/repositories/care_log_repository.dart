@@ -53,10 +53,19 @@ class CareLogRepository {
     return log;
   }
 
-  Future<void> updateLog(String petId, CareLog log, {String? note, String? photoUrl}) async {
+  Future<void> updateLog(
+    String petId,
+    CareLog log, {
+    String? note,
+    String? photoUrl,
+    CareLogType? type,
+    DateTime? at,
+  }) async {
     final updated = <String, dynamic>{
       if (note != null) 'note': note,
       if (photoUrl != null) 'photoUrl': photoUrl,
+      if (type != null) 'type': type.name,
+      if (at != null) 'at': at,
     };
     if (updated.isEmpty) return;
     await _logsCol(petId).doc(log.id).update(updated);
