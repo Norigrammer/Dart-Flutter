@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_controller.dart';
 import '../data/repositories/pet_repository.dart';
 import 'package:go_router/go_router.dart';
+import '../models/pet.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -63,6 +64,22 @@ class HomePage extends ConsumerWidget {
                   onTap: () {
                     context.push('/pets/${pet.id}', extra: pet);
                   },
+                  trailing: PopupMenuButton<_PetAction>(
+                    onSelected: (action) async {
+                      switch (action) {
+                        case _PetAction.edit:
+                          await _showEditPetDialog(context, ref, pet);
+                          break;
+                        case _PetAction.delete:
+                          await _confirmDeletePet(context, ref, pet);
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: _PetAction.edit, child: Text('名前を編集')),
+                      const PopupMenuItem(value: _PetAction.delete, child: Text('削除')),
+                    ],
+                  ),
                 );
               },
             );
@@ -100,6 +117,8 @@ class _EmptyPetsView extends StatelessWidget {
     );
   }
 }
+
+enum _PetAction { edit, delete }
 
 Future<void> _showAddPetDialog(BuildContext context, WidgetRef ref) async {
   final formKey = GlobalKey<FormState>();
@@ -187,6 +206,171 @@ Future<void> _showAddPetDialog(BuildContext context, WidgetRef ref) async {
           ],
         );
       });
+    },
+  );
+}
+
+Future<void> _showEditPetDialog(BuildContext context, WidgetRef ref, Pet pet) async {
+  final formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController(text: pet.name);
+  bool loading = false;
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      final repo = ref.read(petRepositoryProvider);
+      return StatefulBuilder(builder: (context, setState) {
+        Future<void> doUpdate() async {
+          if (!formKey.currentState!.validate()) return;
+          setState(() => loading = true);
+          final newName = nameController.text.trim();
+          try {
+            await repo
+                .updatePet(pet, name: newName)
+                .timeout(const Duration(seconds: 15));
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          } on TimeoutException {
+            if (!dialogContext.mounted) return;
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              const SnackBar(content: Text('更新がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
+            );
+            setState(() => loading = false);
+          } on FirebaseException catch (e) {
+            if (!dialogContext.mounted) return;
+            var msg = '更新に失敗しました: ${e.message ?? e.code}';
+            switch (e.code) {
+              case 'permission-denied':
+                msg = '更新に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                break;
+              case 'failed-precondition':
+                msg = '更新に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                break;
+              case 'unavailable':
+                msg = '更新に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                break;
+            }
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              SnackBar(content: Text(msg)),
+            );
+            setState(() => loading = false);
+          } catch (e) {
+            if (!dialogContext.mounted) return;
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              SnackBar(content: Text('更新に失敗しました: $e')),
+            );
+            setState(() => loading = false);
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('名前を編集'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: nameController,
+              enabled: !loading,
+              decoration: const InputDecoration(
+                labelText: '名前',
+                hintText: '例: ポチ',
+              ),
+              autofillHints: const [AutofillHints.name],
+              enableSuggestions: false,
+              autocorrect: false,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return '名前を入力してください';
+                if (v.trim().length > 30) return '30文字以内で入力してください';
+                return null;
+              },
+              autofocus: true,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: loading ? null : doUpdate,
+              child: loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('保存'),
+            ),
+          ],
+        );
+      });
+    },
+  );
+}
+
+Future<void> _confirmDeletePet(BuildContext context, WidgetRef ref, Pet pet) async {
+  bool loading = false;
+  final repo = ref.read(petRepositoryProvider);
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> doDelete() async {
+            setState(() => loading = true);
+            try {
+              await repo.deletePet(pet).timeout(const Duration(seconds: 15));
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('「${pet.name}」を削除しました')),
+                );
+              }
+            } on TimeoutException {
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content: Text('削除がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
+              );
+              setState(() => loading = false);
+            } on FirebaseException catch (e) {
+              if (!dialogContext.mounted) return;
+              var msg = '削除に失敗しました: ${e.message ?? e.code}';
+              switch (e.code) {
+                case 'permission-denied':
+                  msg = '削除に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                  break;
+                case 'failed-precondition':
+                  msg = '削除に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                  break;
+                case 'unavailable':
+                  msg = '削除に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                  break;
+              }
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text(msg)),
+              );
+              setState(() => loading = false);
+            } catch (e) {
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(content: Text('削除に失敗しました: $e')),
+              );
+              setState(() => loading = false);
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('ペットを削除しますか？'),
+            content: const Text('この操作は取り消せません。ログなどのサブコレクションは残る場合があります。'),
+            actions: [
+              TextButton(
+                onPressed: loading ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('キャンセル'),
+              ),
+              FilledButton.tonal(
+                onPressed: loading ? null : doDelete,
+                child: loading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('削除'),
+              ),
+            ],
+          );
+        },
+      );
     },
   );
 }
