@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,33 +7,63 @@ import '../models/pet.dart';
 import '../models/care_log.dart';
 import '../data/repositories/care_log_repository.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
+import 'package:image_picker/image_picker.dart';
 
-class PetDetailPage extends ConsumerWidget {
+class PetDetailPage extends ConsumerStatefulWidget {
   const PetDetailPage({super.key, required this.pet});
   final Pet pet;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(petLogsProvider(pet.id));
+  ConsumerState<PetDetailPage> createState() => _PetDetailPageState();
+}
+
+class _PetDetailPageState extends ConsumerState<PetDetailPage> {
+  Set<CareLogType> _selectedTypes = {};
+  DateTimeRange? _dateRange;
+
+  @override
+  Widget build(BuildContext context) {
+    final logsAsync = ref.watch(petLogsProvider(widget.pet.id));
     return Scaffold(
-      appBar: AppBar(title: Text(pet.name)),
+      appBar: AppBar(title: Text(widget.pet.name)),
       body: Column(
         children: [
-          _PetHeader(pet: pet),
+          _PetHeader(pet: widget.pet),
+          _FilterBar(
+            selectedTypes: _selectedTypes,
+            range: _dateRange,
+            onTypesChanged: (s) => setState(() => _selectedTypes = s),
+            onRangeChanged: (r) => setState(() => _dateRange = r),
+          ),
           const Divider(height: 0),
           Expanded(
             child: logsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => _ErrorView(error: e, onRetry: () => ref.invalidate(petLogsProvider(pet.id))),
+              error: (e, st) => _ErrorView(error: e, onRetry: () => ref.invalidate(petLogsProvider(widget.pet.id))),
               data: (logs) {
-                if (logs.isEmpty) return const _EmptyLogsView();
+                // クライアントサイドフィルター
+                var filtered = logs;
+                if (_selectedTypes.isNotEmpty) {
+                  filtered = filtered.where((l) => _selectedTypes.contains(l.type)).toList();
+                }
+                if (_dateRange != null) {
+                  final start = DateTime(_dateRange!.start.year, _dateRange!.start.month, _dateRange!.start.day);
+                  final end = DateTime(_dateRange!.end.year, _dateRange!.end.month, _dateRange!.end.day, 23, 59, 59, 999);
+                  filtered = filtered.where((l) {
+                    final t = l.at.toLocal();
+                    return !t.isBefore(start) && !t.isAfter(end);
+                  }).toList();
+                }
+                if (filtered.isEmpty) return const _EmptyLogsView();
                 return ListView.separated(
-                  itemCount: logs.length,
+                  itemCount: filtered.length,
                   separatorBuilder: (_, __) => const Divider(height: 0),
                   itemBuilder: (context, index) {
-                    final log = logs[index];
+                    final log = filtered[index];
                     return ListTile(
-                      leading: CircleAvatar(child: Icon(_iconOf(log.type))),
+                      leading: (log.photoUrl != null && log.photoUrl!.isNotEmpty)
+                          ? CircleAvatar(backgroundImage: NetworkImage(log.photoUrl!))
+                          : CircleAvatar(child: Icon(_iconOf(log.type))),
                       title: Text(_labelOf(log.type)),
                       subtitle: Text(_formatDateTime(log.at.toLocal()) + (log.note != null && log.note!.isNotEmpty ? "\n" + log.note! : "")),
                       isThreeLine: (log.note != null && log.note!.isNotEmpty),
@@ -40,10 +71,10 @@ class PetDetailPage extends ConsumerWidget {
                         onSelected: (action) async {
                           switch (action) {
                             case _LogAction.edit:
-                              await _showEditLogDialog(context, ref, pet.id, log);
+                              await _showEditLogDialog(context, ref, widget.pet.id, log);
                               break;
                             case _LogAction.delete:
-                              await _confirmDeleteLog(context, ref, pet.id, log);
+                              await _confirmDeleteLog(context, ref, widget.pet.id, log);
                               break;
                           }
                         },
@@ -62,8 +93,69 @@ class PetDetailPage extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'ログを追加',
-        onPressed: () => _showAddLogDialog(context, ref, pet.id),
+        onPressed: () => _showAddLogDialog(context, ref, widget.pet.id),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.selectedTypes,
+    required this.range,
+    required this.onTypesChanged,
+    required this.onRangeChanged,
+  });
+  final Set<CareLogType> selectedTypes;
+  final DateTimeRange? range;
+  final ValueChanged<Set<CareLogType>> onTypesChanged;
+  final ValueChanged<DateTimeRange?> onRangeChanged;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Wrap(
+            spacing: 8,
+            children: CareLogType.values.map((t) {
+              final on = selectedTypes.contains(t);
+              return FilterChip(
+                label: Text(_labelOf(t)),
+                selected: on,
+                onSelected: (v) {
+                  final set = <CareLogType>{...selectedTypes};
+                  if (v) {
+                    set.add(t);
+                  } else {
+                    set.remove(t);
+                  }
+                  onTypesChanged(set);
+                },
+              );
+            }).toList(),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () async {
+              final initial = range ?? DateTimeRange(start: DateTime.now().subtract(const Duration(days: 7)), end: DateTime.now());
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+                initialDateRange: initial,
+              );
+              if (picked != null) {
+                onRangeChanged(picked);
+              }
+            },
+            icon: const Icon(Icons.filter_list),
+      label: Text(range == null
+        ? '期間'
+        : '${range!.start.month}/${range!.start.day} - ${range!.end.month}/${range!.end.day}'),
+          ),
+        ],
       ),
     );
   }
@@ -134,6 +226,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
   DateTime at = DateTime.now();
   final noteController = TextEditingController();
   bool loading = false;
+  Uint8List? pickedImageBytes;
 
   await showDialog<void>(
     context: context,
@@ -163,8 +256,22 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
             if (!formKey.currentState!.validate() || type == null) return;
             setState(() => loading = true);
             try {
+              String? photoUrl;
+              final logId = await repo.generateLogId(petId);
+              if (pickedImageBytes != null) {
+                photoUrl = await repo
+                    .uploadLogPhoto(petId: petId, logId: logId, bytes: pickedImageBytes!)
+                    .timeout(const Duration(seconds: 30));
+              }
               await repo
-                  .addLog(petId: petId, type: type!, at: at, note: noteController.text.trim().isEmpty ? null : noteController.text.trim())
+                  .addLogWithId(
+                    petId: petId,
+                    id: logId,
+                    type: type!,
+                    at: at,
+                    note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                    photoUrl: photoUrl,
+                  )
                   .timeout(const Duration(seconds: 15));
               if (context.mounted) Navigator.of(context).pop();
             } on TimeoutException {
@@ -232,6 +339,31 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                     decoration: const InputDecoration(labelText: 'メモ（任意）'),
                     maxLines: 3,
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: loading
+                            ? null
+                            : () async {
+                                final picked = await ImagePicker().pickImage(
+                                  source: ImageSource.gallery,
+                                  maxWidth: 1600,
+                                  imageQuality: 85,
+                                );
+                                if (picked != null) {
+                                  pickedImageBytes = await picked.readAsBytes();
+                                  setState(() {});
+                                }
+                              },
+                        icon: const Icon(Icons.photo),
+                        label: const Text('画像を選択'),
+                      ),
+                      const SizedBox(width: 12),
+                      if (pickedImageBytes != null)
+                        const Text('画像が選択されました', style: TextStyle(color: Colors.green)),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -289,6 +421,8 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
   DateTime at = log.at.toLocal();
   final noteController = TextEditingController(text: log.note ?? '');
   bool loading = false;
+  Uint8List? newImageBytes;
+  bool removePhoto = false;
 
   await showDialog<void>(
     context: context,
@@ -317,6 +451,24 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
           if (!formKey.currentState!.validate() || type == null) return;
           setState(() => loading = true);
           try {
+            String? photoUrl;
+            bool shouldRemove = removePhoto;
+            if (newImageBytes != null) {
+              if (log.photoUrl != null && log.photoUrl!.isNotEmpty) {
+                try {
+                  await repo.deleteLogPhoto(petId: petId, logId: log.id).timeout(const Duration(seconds: 15));
+                } catch (_) {}
+              }
+              photoUrl = await repo
+                  .uploadLogPhoto(petId: petId, logId: log.id, bytes: newImageBytes!)
+                  .timeout(const Duration(seconds: 30));
+              shouldRemove = false;
+            }
+            if (shouldRemove) {
+              try {
+                await repo.deleteLogPhoto(petId: petId, logId: log.id).timeout(const Duration(seconds: 15));
+              } catch (_) {}
+            }
             await repo
                 .updateLog(
                   petId,
@@ -324,6 +476,8 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                   type: type,
                   at: at,
                   note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                  photoUrl: photoUrl,
+                  removePhoto: shouldRemove,
                 )
                 .timeout(const Duration(seconds: 15));
             if (dialogContext.mounted) Navigator.of(dialogContext).pop();
@@ -391,6 +545,46 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                   enabled: !loading,
                   decoration: const InputDecoration(labelText: 'メモ（任意）'),
                   maxLines: 3,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: loading
+                          ? null
+                          : () async {
+                              final picked = await ImagePicker().pickImage(
+                                source: ImageSource.gallery,
+                                maxWidth: 1600,
+                                imageQuality: 85,
+                              );
+                              if (picked != null) {
+                                newImageBytes = await picked.readAsBytes();
+                                setState(() => removePhoto = false);
+                              }
+                            },
+                      icon: const Icon(Icons.photo),
+                      label: const Text('画像を選択'),
+                    ),
+                    const SizedBox(width: 12),
+                    if (newImageBytes != null)
+                      const Text('新しい画像が選択されました', style: TextStyle(color: Colors.green))
+                    else if (log.photoUrl != null && log.photoUrl!.isNotEmpty && !removePhoto)
+                      const Text('既存の画像があります'),
+                    const Spacer(),
+                    if ((log.photoUrl != null && log.photoUrl!.isNotEmpty) || newImageBytes != null)
+                      TextButton.icon(
+                        onPressed: loading
+                            ? null
+                            : () {
+                                newImageBytes = null;
+                                setState(() => removePhoto = true);
+                              },
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('画像を削除'),
+                      ),
+                  ],
                 ),
               ],
             ),
