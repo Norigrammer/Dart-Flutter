@@ -227,6 +227,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
   final noteController = TextEditingController();
   bool loading = false;
   Uint8List? pickedImageBytes;
+  double uploadProgress = 0.0;
 
   await showDialog<void>(
     context: context,
@@ -260,8 +261,13 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
               final logId = await repo.generateLogId(petId);
               if (pickedImageBytes != null) {
                 photoUrl = await repo
-                    .uploadLogPhoto(petId: petId, logId: logId, bytes: pickedImageBytes!)
-                    .timeout(const Duration(seconds: 30));
+                    .uploadLogPhoto(
+                      petId: petId,
+                      logId: logId,
+                      bytes: pickedImageBytes!,
+                      onProgress: (p) => setState(() => uploadProgress = p),
+                    )
+                    .timeout(const Duration(seconds: 60));
               }
               await repo
                   .addLogWithId(
@@ -353,7 +359,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                                 );
                                 if (picked != null) {
                                   pickedImageBytes = await picked.readAsBytes();
-                                  setState(() {});
+                                setState(() {});
                                 }
                               },
                         icon: const Icon(Icons.photo),
@@ -361,9 +367,21 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                       ),
                       const SizedBox(width: 12),
                       if (pickedImageBytes != null)
-                        const Text('画像が選択されました', style: TextStyle(color: Colors.green)),
+                        SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(pickedImageBytes!, fit: BoxFit.cover),
+                          ),
+                        ),
                     ],
                   ),
+                  if (loading && pickedImageBytes != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
+                    ),
                 ],
               ),
             ),
@@ -423,6 +441,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
   bool loading = false;
   Uint8List? newImageBytes;
   bool removePhoto = false;
+  double uploadProgress = 0.0;
 
   await showDialog<void>(
     context: context,
@@ -460,8 +479,13 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                 } catch (_) {}
               }
               photoUrl = await repo
-                  .uploadLogPhoto(petId: petId, logId: log.id, bytes: newImageBytes!)
-                  .timeout(const Duration(seconds: 30));
+                  .uploadLogPhoto(
+                    petId: petId,
+                    logId: log.id,
+                    bytes: newImageBytes!,
+                    onProgress: (p) => setState(() => uploadProgress = p),
+                  )
+                  .timeout(const Duration(seconds: 60));
               shouldRemove = false;
             }
             if (shouldRemove) {
@@ -569,9 +593,23 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                     ),
                     const SizedBox(width: 12),
                     if (newImageBytes != null)
-                      const Text('新しい画像が選択されました', style: TextStyle(color: Colors.green))
+                      SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(newImageBytes!, fit: BoxFit.cover),
+                        ),
+                      )
                     else if (log.photoUrl != null && log.photoUrl!.isNotEmpty && !removePhoto)
-                      const Text('既存の画像があります'),
+                      SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(log.photoUrl!, fit: BoxFit.cover),
+                        ),
+                      ),
                     const Spacer(),
                     if ((log.photoUrl != null && log.photoUrl!.isNotEmpty) || newImageBytes != null)
                       TextButton.icon(
@@ -586,6 +624,11 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                       ),
                   ],
                 ),
+                if (loading && (newImageBytes != null))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
+                  ),
               ],
             ),
           ),
