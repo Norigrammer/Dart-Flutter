@@ -121,10 +121,20 @@ class CareLogRepository {
     required Uint8List bytes,
     String contentType = 'image/jpeg',
     String fileExtension = 'jpg',
+    void Function(double progress)? onProgress,
   }) async {
     final ref = _storage.ref().child('pets/$petId/logs/$logId.$fileExtension');
-    final task = await ref.putData(bytes, SettableMetadata(contentType: contentType));
-    return await task.ref.getDownloadURL();
+    final uploadTask = ref.putData(bytes, SettableMetadata(contentType: contentType));
+    if (onProgress != null) {
+      uploadTask.snapshotEvents.listen((event) {
+        final total = event.totalBytes;
+        if (total > 0) {
+          onProgress(event.bytesTransferred / total);
+        }
+      });
+    }
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
   }
 
   Future<void> deleteLogPhoto({
