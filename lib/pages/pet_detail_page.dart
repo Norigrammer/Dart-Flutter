@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'pet_statistics_page.dart';
 import 'weekly_summary_page.dart';
+import 'log_search_page.dart';
 
 class PetDetailPage extends ConsumerStatefulWidget {
   const PetDetailPage({super.key, required this.pet});
@@ -31,6 +32,17 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
       appBar: AppBar(
         title: Text(widget.pet.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '検索',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => LogSearchPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_view_week),
             tooltip: '週間サマリー',
