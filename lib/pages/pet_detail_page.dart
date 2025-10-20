@@ -8,6 +8,10 @@ import '../models/care_log.dart';
 import '../data/repositories/care_log_repository.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
+import 'pet_statistics_page.dart';
+import 'weekly_summary_page.dart';
+import 'log_search_page.dart';
 
 class PetDetailPage extends ConsumerStatefulWidget {
   const PetDetailPage({super.key, required this.pet});
@@ -25,7 +29,44 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
   Widget build(BuildContext context) {
     final logsAsync = ref.watch(petLogsProvider(widget.pet.id));
     return Scaffold(
-      appBar: AppBar(title: Text(widget.pet.name)),
+      appBar: AppBar(
+        title: Text(widget.pet.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '検索',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => LogSearchPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_view_week),
+            tooltip: '週間サマリー',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => WeeklySummaryPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            tooltip: '統計情報',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PetStatisticsPage(pet: widget.pet),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           _PetHeader(pet: widget.pet),
