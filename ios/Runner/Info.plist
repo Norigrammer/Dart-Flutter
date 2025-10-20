@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Photo library / Camera permissions for image attachments -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>フォトライブラリの写真をログに添付するために使用します。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>カメラで撮影した写真をログに添付するために使用します。</string>
 </dict>
 </plist>
