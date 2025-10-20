@@ -8,7 +8,6 @@ import '../models/care_log.dart';
 import '../data/repositories/care_log_repository.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:image_picker/image_picker.dart';
-import 'package:go_router/go_router.dart';
 import 'pet_statistics_page.dart';
 import 'weekly_summary_page.dart';
 import 'log_search_page.dart';
@@ -103,7 +102,10 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
                     final log = filtered[index];
                     return ListTile(
                       leading: (log.photoUrl != null && log.photoUrl!.isNotEmpty)
-                          ? CircleAvatar(backgroundImage: NetworkImage(log.photoUrl!))
+                          ? InkWell(
+                              onTap: () => _openPhotoViewer(context, log.photoUrl!),
+                              child: CircleAvatar(backgroundImage: NetworkImage(log.photoUrl!)),
+                            )
                           : CircleAvatar(child: Icon(_iconOf(log.type))),
                       title: Text(_labelOf(log.type)),
                       subtitle: Text(_formatDateTime(log.at.toLocal()) + (log.note != null && log.note!.isNotEmpty ? "\n" + log.note! : "")),
@@ -139,6 +141,44 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
       ),
     );
   }
+}
+
+void _openPhotoViewer(BuildContext context, String url) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.9),
+    builder: (_) {
+      return GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 5,
+                    child: Image.network(url),
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    color: Colors.white,
+                    icon: const Icon(Icons.close),
+                    tooltip: '閉じる',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _FilterBar extends StatelessWidget {
@@ -268,6 +308,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
   final noteController = TextEditingController();
   bool loading = false;
   Uint8List? pickedImageBytes;
+  String? errorMsg;
   double uploadProgress = 0.0;
 
   await showDialog<void>(
@@ -296,7 +337,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
 
           Future<void> doAdd() async {
             if (!formKey.currentState!.validate() || type == null) return;
-            setState(() => loading = true);
+            setState(() { loading = true; errorMsg = null; uploadProgress = 0.0; });
             try {
               String? photoUrl;
               final logId = await repo.generateLogId(petId);
@@ -326,27 +367,36 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('追加がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
               );
-              setState(() => loading = false);
+              setState(() { loading = false; errorMsg = 'タイムアウトしました。再試行してください。'; });
             } on FirebaseException catch (e) {
               if (!context.mounted) return;
-              var msg = '追加に失敗しました: ${e.message ?? e.code}';
+              String reason;
               switch (e.code) {
                 case 'permission-denied':
-                  msg = '追加に失敗しました: 権限がありません（Firestore ルールを確認してください）';
+                  reason = '権限がありません（Storage/Firestore のセキュリティルールを確認してください）';
+                  break;
+                case 'unauthenticated':
+                  reason = '未ログインのため操作できません。再ログインしてください。';
+                  break;
+                case 'cancelled':
+                  reason = '操作がキャンセルされました。';
                   break;
                 case 'failed-precondition':
-                  msg = '追加に失敗しました: Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
+                  reason = 'Firestore がまだ有効化されていない可能性があります（Firebase コンソールで作成してください）';
                   break;
                 case 'unavailable':
-                  msg = '追加に失敗しました: サービスに接続できません（回線状況を確認してください）';
+                  reason = 'サービスに接続できません（回線状況をご確認ください）';
                   break;
+                default:
+                  reason = e.message ?? e.code;
               }
+              final msg = '追加に失敗しました: $reason';
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-              setState(() => loading = false);
+              setState(() { loading = false; errorMsg = msg; });
             } catch (e) {
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('追加に失敗しました: $e')));
-              setState(() => loading = false);
+              setState(() { loading = false; errorMsg = '追加に失敗しました: $e'; });
             }
           }
 
@@ -423,6 +473,39 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                       padding: const EdgeInsets.only(top: 8.0),
                       child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
                     ),
+                  if (errorMsg != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(errorMsg!, style: const TextStyle(color: Colors.red)) ),
+                          TextButton.icon(
+                            onPressed: loading ? null : doAdd,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('再試行'),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: loading
+                                ? null
+                                : () async {
+                                    final picked = await ImagePicker().pickImage(
+                                      source: ImageSource.gallery,
+                                      maxWidth: 1600,
+                                      imageQuality: 85,
+                                    );
+                                    if (picked != null) {
+                                      pickedImageBytes = await picked.readAsBytes();
+                                      setState(() { errorMsg = null; });
+                                    }
+                                  },
+                            child: const Text('画像を選び直す'),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -483,6 +566,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
   Uint8List? newImageBytes;
   bool removePhoto = false;
   double uploadProgress = 0.0;
+  String? errorMsg;
 
   await showDialog<void>(
     context: context,
@@ -509,7 +593,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
 
         Future<void> doUpdate() async {
           if (!formKey.currentState!.validate() || type == null) return;
-          setState(() => loading = true);
+          setState(() { loading = true; errorMsg = null; uploadProgress = 0.0; });
           try {
             String? photoUrl;
             bool shouldRemove = removePhoto;
@@ -551,7 +635,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
             ScaffoldMessenger.of(dialogContext).showSnackBar(
               const SnackBar(content: Text('更新がタイムアウトしました。ネットワーク接続や Firestore の状態を確認してください。')),
             );
-            setState(() => loading = false);
+            setState(() { loading = false; errorMsg = 'タイムアウトしました。再試行してください。'; });
           } on FirebaseException catch (e) {
             if (!dialogContext.mounted) return;
             var msg = '更新に失敗しました: ${e.message ?? e.code}';
@@ -567,11 +651,11 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                 break;
             }
             ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(msg)));
-            setState(() => loading = false);
+            setState(() { loading = false; errorMsg = msg; });
           } catch (e) {
             if (!dialogContext.mounted) return;
             ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('更新に失敗しました: $e')));
-            setState(() => loading = false);
+            setState(() { loading = false; errorMsg = '更新に失敗しました: $e'; });
           }
         }
 
@@ -669,6 +753,22 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
+                  ),
+                if (errorMsg != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(errorMsg!, style: const TextStyle(color: Colors.red)) ),
+                        TextButton.icon(
+                          onPressed: loading ? null : doUpdate,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('再試行'),
+                        )
+                      ],
+                    ),
                   ),
               ],
             ),
