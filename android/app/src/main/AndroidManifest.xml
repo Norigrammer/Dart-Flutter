@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Removed image/camera permissions as app no longer uses image capture/picking -->
     <application
-        android:label="sample"
+        android:label="Pettime"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_controller.dart';
@@ -28,62 +27,79 @@ class HomePage extends ConsumerWidget {
           )
         ],
       ),
-      body: petsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 12),
-                Text('読み込みでエラーが発生しました\n${e.toString()}', textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: () => ref.invalidate(myPetsStreamProvider),
-                  child: const Text('再試行'),
-                )
-              ],
+      body: Stack(
+        children: [
+          // Background PNG (switch by theme brightness)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Image.asset(
+                Theme.of(context).brightness == Brightness.dark
+                    ? 'assets/backgrounds/home_bg_dark.png'
+                    : 'assets/backgrounds/home_bg_light.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
             ),
           ),
-        ),
-        data: (pets) {
-          if (pets.isEmpty) {
-            return const _EmptyPetsView();
-          }
-            return ListView.separated(
-              itemCount: pets.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
-              itemBuilder: (context, index) {
-                final pet = pets[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.pets)),
-                  title: Text(pet.name),
-                  subtitle: Text('メンバー: ${pet.members.length}人'),
-                  onTap: () {
-                    context.push('/pets/${pet.id}', extra: pet);
-                  },
-                  trailing: PopupMenuButton<_PetAction>(
-                    onSelected: (action) async {
-                      switch (action) {
-                        case _PetAction.edit:
-                          await _showEditPetDialog(context, ref, pet);
-                          break;
-                        case _PetAction.delete:
-                          await _confirmDeletePet(context, ref, pet);
-                          break;
-                      }
+          // Foreground content
+          petsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, st) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 12),
+                    Text('読み込みでエラーが発生しました\n${e.toString()}', textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => ref.invalidate(myPetsStreamProvider),
+                      child: const Text('再試行'),
+                    )
+                  ],
+                ),
+              ),
+            ),
+            data: (pets) {
+              if (pets.isEmpty) {
+                return const _EmptyPetsView();
+              }
+              return ListView.separated(
+                itemCount: pets.length,
+                separatorBuilder: (_, __) => const Divider(height: 0),
+                itemBuilder: (context, index) {
+                  final pet = pets[index];
+                  return ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.pets)),
+                    title: Text(pet.name),
+                    subtitle: Text('メンバー: ${pet.members.length}人'),
+                    onTap: () {
+                      context.push('/pets/${pet.id}', extra: pet);
                     },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: _PetAction.edit, child: Text('名前を編集')),
-                      const PopupMenuItem(value: _PetAction.delete, child: Text('削除')),
-                    ],
-                  ),
-                );
-              },
-            );
-        },
+                    trailing: PopupMenuButton<_PetAction>(
+                      onSelected: (action) async {
+                        switch (action) {
+                          case _PetAction.edit:
+                            await _showEditPetDialog(context, ref, pet);
+                            break;
+                          case _PetAction.delete:
+                            await _confirmDeletePet(context, ref, pet);
+                            break;
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: _PetAction.edit, child: Text('名前を編集')),
+                        PopupMenuItem(value: _PetAction.delete, child: Text('削除')),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'ペットを追加',
