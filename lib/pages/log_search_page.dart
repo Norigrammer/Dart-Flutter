@@ -34,7 +34,7 @@ class _LogSearchPageState extends ConsumerState<LogSearchPage> {
           decoration: const InputDecoration(
             hintText: 'メモを検索...',
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.white70),
+            hintStyle: TextStyle(color: Colors.grey),
           ),
           style: const TextStyle(color: Colors.white, fontSize: 18),
           onChanged: (value) {

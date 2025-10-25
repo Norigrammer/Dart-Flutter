@@ -103,7 +103,7 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
                     return ListTile(
                       leading: CircleAvatar(child: Icon(_iconOf(log.type))),
                       title: Text(_labelOf(log.type)),
-                      subtitle: Text(_formatDateTime(log.at.toLocal()) + (log.note != null && log.note!.isNotEmpty ? "\n" + log.note! : "")),
+                      subtitle: Text('${_formatDateTime(log.at.toLocal())}${(log.note != null && log.note!.isNotEmpty) ? '\n${log.note!}' : ''}'),
                       isThreeLine: (log.note != null && log.note!.isNotEmpty),
                       trailing: PopupMenuButton<_LogAction>(
                         onSelected: (action) async {
@@ -283,6 +283,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
               lastDate: DateTime(2100),
             );
             if (date == null) return;
+            if (!context.mounted) return;
             final time = await showTimePicker(
               context: context,
               initialTime: TimeOfDay.fromDateTime(at),
@@ -354,7 +355,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<CareLogType>(
-                    value: type,
+                    initialValue: type,
                     items: CareLogType.values
                         .map((t) => DropdownMenuItem(value: t, child: Text(_labelOf(t))))
                         .toList(),
@@ -473,6 +474,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
             lastDate: DateTime(2100),
           );
           if (date == null) return;
+          if (!context.mounted) return;
           final time = await showTimePicker(
             context: context,
             initialTime: TimeOfDay.fromDateTime(at),
@@ -534,7 +536,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<CareLogType>(
-                  value: type,
+                  initialValue: type,
                   items: CareLogType.values
                       .map((t) => DropdownMenuItem(value: t, child: Text(_labelOf(t))))
                       .toList(),

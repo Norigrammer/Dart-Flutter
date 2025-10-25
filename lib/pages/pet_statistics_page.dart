@@ -117,7 +117,7 @@ class PetStatisticsPage extends ConsumerWidget {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: color.withOpacity(0.2),
+              backgroundColor: color.withValues(alpha: 0.2),
               child: Icon(icon, color: color),
             ),
             const SizedBox(width: 16),
