@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/pet.dart';
-import '../models/care_log.dart';
 import '../data/providers/statistics_provider.dart';
 
 class PetStatisticsPage extends ConsumerWidget {

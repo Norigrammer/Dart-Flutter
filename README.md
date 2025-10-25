@@ -153,3 +153,36 @@ service cloud.firestore {
 - エクスポート機能: ログをPDFやCSVで出力
 
 
+## セキュリティルール（Firestore / Storage）
+
+このプロジェクトでは、以下の場所にルールファイルを配置しています。
+
+- Firestore: `firestore.rules`
+- Storage: `storage.rules`
+
+`firebase.json` には、これらのファイルへのパスが設定済みです。
+
+### デプロイ手順（Firebase CLI）
+
+事前に Firebase CLI ログインとプロジェクト選択を済ませてください。
+
+```powershell
+firebase login
+firebase use pet-time-7398c
+
+# Firestore ルールのみデプロイ
+firebase deploy --only firestore:rules
+
+# Storage ルールのみデプロイ
+firebase deploy --only storage
+
+# まとめてデプロイ
+firebase deploy --only firestore,storage
+```
+
+注意: Storage のルールでは Firestore ドキュメントを参照できないため、
+ペットのメンバー判定は行えません。
+現状は「サインイン済みユーザー」かつ「画像ファイル（5MB未満）」に限定しています。
+より厳格な制御（メンバー判定）には、Cloud Functions やカスタムクレーム等の併用が必要です。
+
+
