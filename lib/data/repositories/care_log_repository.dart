@@ -1,15 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/care_log.dart';
 
 class CareLogRepository {
-  CareLogRepository(this._firestore, this._auth, this._storage);
+  CareLogRepository(this._firestore, this._auth);
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
-  final FirebaseStorage _storage;
 
   String get _uid => _auth.currentUser!.uid;
 
@@ -114,44 +111,12 @@ class CareLogRepository {
   Future<void> deleteLog(String petId, CareLog log) async {
     await _logsCol(petId).doc(log.id).delete();
   }
-
-  Future<String> uploadLogPhoto({
-    required String petId,
-    required String logId,
-    required Uint8List bytes,
-    String contentType = 'image/jpeg',
-    String fileExtension = 'jpg',
-    void Function(double progress)? onProgress,
-  }) async {
-    final ref = _storage.ref().child('pets/$petId/logs/$logId.$fileExtension');
-    final uploadTask = ref.putData(bytes, SettableMetadata(contentType: contentType));
-    if (onProgress != null) {
-      uploadTask.snapshotEvents.listen((event) {
-        final total = event.totalBytes;
-        if (total > 0) {
-          onProgress(event.bytesTransferred / total);
-        }
-      });
-    }
-    final snapshot = await uploadTask;
-    return await snapshot.ref.getDownloadURL();
-  }
-
-  Future<void> deleteLogPhoto({
-    required String petId,
-    required String logId,
-    String fileExtension = 'jpg',
-  }) async {
-    final ref = _storage.ref().child('pets/$petId/logs/$logId.$fileExtension');
-    await ref.delete();
-  }
 }
 
 final careLogRepositoryProvider = Provider<CareLogRepository>((ref) {
   final firestore = FirebaseFirestore.instance;
   final auth = FirebaseAuth.instance;
-  final storage = FirebaseStorage.instance;
-  return CareLogRepository(firestore, auth, storage);
+  return CareLogRepository(firestore, auth);
 });
 
 final petLogsProvider = StreamProvider.autoDispose.family<List<CareLog>, String>((ref, petId) {

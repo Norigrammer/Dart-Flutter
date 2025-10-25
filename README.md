@@ -112,7 +112,7 @@ service cloud.firestore {
 - ログ一覧表示（散歩・ごはん・病院の記録）
 - ログの種類・期間でのフィルタリング
 - ログの追加・編集・削除
-- 画像のアップロード（Firebase Storage）
+- 画像添付は現在未対応（Storage 非利用方針）
 
 ## 統計情報 (実装済)
 
@@ -144,7 +144,7 @@ service cloud.firestore {
 ## 次のステップ候補
 
 - ~~統計情報画面: ケアログの記録数・最終記録日などの可視化~~ (実装済)
-- 画像アップロード（Storage）: ペット写真やケアログ写真 (部分実装済)
+- 画像アップロード（Storage）: 非対応（コスト/プラン要件のため）
 - グラフ表示: 週次・月次のケアログ推移をチャート表示
 - Cloud Functions: ペット削除時に logs サブコレクション一括削除
 - 通知（FCM）: 散歩リマインダー等
@@ -153,36 +153,26 @@ service cloud.firestore {
 - エクスポート機能: ログをPDFやCSVで出力
 
 
-## セキュリティルール（Firestore / Storage）
+## セキュリティルール（Firestore）
 
 このプロジェクトでは、以下の場所にルールファイルを配置しています。
 
 - Firestore: `firestore.rules`
-- Storage: `storage.rules`
 
-`firebase.json` には、これらのファイルへのパスが設定済みです。
+Storage は現在使用しません。`storage.rules` は参考用に残っている場合がありますが、デプロイ不要です。
 
 ### デプロイ手順（Firebase CLI）
 
 事前に Firebase CLI ログインとプロジェクト選択を済ませてください。
 
 ```powershell
-firebase login
-firebase use pet-time-7398c
+firebase.cmd login --no-localhost
+firebase.cmd use pet-time-7398c
 
 # Firestore ルールのみデプロイ
-firebase deploy --only firestore:rules
-
-# Storage ルールのみデプロイ
-firebase deploy --only storage
-
-# まとめてデプロイ
-firebase deploy --only firestore,storage
+firebase.cmd deploy --only firestore:rules
 ```
 
-注意: Storage のルールでは Firestore ドキュメントを参照できないため、
-ペットのメンバー判定は行えません。
-現状は「サインイン済みユーザー」かつ「画像ファイル（5MB未満）」に限定しています。
-より厳格な制御（メンバー判定）には、Cloud Functions やカスタムクレーム等の併用が必要です。
+メモ: PowerShell では実行ポリシーにより `firebase.ps1` がブロックされる場合があります。その場合は `firebase.cmd` を利用してください。
 
 

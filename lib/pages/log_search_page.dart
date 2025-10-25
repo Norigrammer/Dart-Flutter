@@ -140,9 +140,7 @@ class _LogSearchPageState extends ConsumerState<LogSearchPage> {
                   itemBuilder: (context, index) {
                     final log = filteredLogs[index];
                     return ListTile(
-                      leading: (log.photoUrl != null && log.photoUrl!.isNotEmpty)
-                          ? CircleAvatar(backgroundImage: NetworkImage(log.photoUrl!))
-                          : CircleAvatar(child: Icon(_iconOf(log.type))),
+                      leading: CircleAvatar(child: Icon(_iconOf(log.type))),
                       title: Text(_labelOf(log.type)),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

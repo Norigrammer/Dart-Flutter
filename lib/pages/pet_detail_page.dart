@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+// no-op
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +7,7 @@ import '../models/pet.dart';
 import '../models/care_log.dart';
 import '../data/repositories/care_log_repository.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
-import 'package:image_picker/image_picker.dart';
+// Image picking/viewing removed: no Firebase Storage usage
 import 'pet_statistics_page.dart';
 import 'weekly_summary_page.dart';
 import 'log_search_page.dart';
@@ -101,12 +101,7 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
                   itemBuilder: (context, index) {
                     final log = filtered[index];
                     return ListTile(
-                      leading: (log.photoUrl != null && log.photoUrl!.isNotEmpty)
-                          ? InkWell(
-                              onTap: () => _openPhotoViewer(context, log.photoUrl!),
-                              child: CircleAvatar(backgroundImage: NetworkImage(log.photoUrl!)),
-                            )
-                          : CircleAvatar(child: Icon(_iconOf(log.type))),
+                      leading: CircleAvatar(child: Icon(_iconOf(log.type))),
                       title: Text(_labelOf(log.type)),
                       subtitle: Text(_formatDateTime(log.at.toLocal()) + (log.note != null && log.note!.isNotEmpty ? "\n" + log.note! : "")),
                       isThreeLine: (log.note != null && log.note!.isNotEmpty),
@@ -143,43 +138,7 @@ class _PetDetailPageState extends ConsumerState<PetDetailPage> {
   }
 }
 
-void _openPhotoViewer(BuildContext context, String url) {
-  showDialog<void>(
-    context: context,
-    barrierColor: Colors.black.withOpacity(0.9),
-    builder: (_) {
-      return GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
-            child: Stack(
-              children: [
-                Center(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 5,
-                    child: Image.network(url),
-                  ),
-                ),
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    color: Colors.white,
-                    icon: const Icon(Icons.close),
-                    tooltip: '閉じる',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
+// Fullscreen photo viewer removed
 
 class _FilterBar extends StatelessWidget {
   const _FilterBar({
@@ -307,9 +266,8 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
   DateTime at = DateTime.now();
   final noteController = TextEditingController();
   bool loading = false;
-  Uint8List? pickedImageBytes;
+  // Image selection/upload removed
   String? errorMsg;
-  double uploadProgress = 0.0;
 
   await showDialog<void>(
     context: context,
@@ -337,20 +295,9 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
 
           Future<void> doAdd() async {
             if (!formKey.currentState!.validate() || type == null) return;
-            setState(() { loading = true; errorMsg = null; uploadProgress = 0.0; });
+            setState(() { loading = true; errorMsg = null; });
             try {
-              String? photoUrl;
               final logId = await repo.generateLogId(petId);
-              if (pickedImageBytes != null) {
-                photoUrl = await repo
-                    .uploadLogPhoto(
-                      petId: petId,
-                      logId: logId,
-                      bytes: pickedImageBytes!,
-                      onProgress: (p) => setState(() => uploadProgress = p),
-                    )
-                    .timeout(const Duration(seconds: 60));
-              }
               await repo
                   .addLogWithId(
                     petId: petId,
@@ -358,7 +305,6 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                     type: type!,
                     at: at,
                     note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
-                    photoUrl: photoUrl,
                   )
                   .timeout(const Duration(seconds: 15));
               if (context.mounted) Navigator.of(context).pop();
@@ -437,42 +383,7 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                     maxLines: 3,
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: loading
-                            ? null
-                            : () async {
-                                final picked = await ImagePicker().pickImage(
-                                  source: ImageSource.gallery,
-                                  maxWidth: 1600,
-                                  imageQuality: 85,
-                                );
-                                if (picked != null) {
-                                  pickedImageBytes = await picked.readAsBytes();
-                                setState(() {});
-                                }
-                              },
-                        icon: const Icon(Icons.photo),
-                        label: const Text('画像を選択'),
-                      ),
-                      const SizedBox(width: 12),
-                      if (pickedImageBytes != null)
-                        SizedBox(
-                          width: 56,
-                          height: 56,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.memory(pickedImageBytes!, fit: BoxFit.cover),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (loading && pickedImageBytes != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
-                    ),
+                  // Image picker and progress removed
                   if (errorMsg != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
@@ -485,23 +396,6 @@ Future<void> _showAddLogDialog(BuildContext context, WidgetRef ref, String petId
                             onPressed: loading ? null : doAdd,
                             icon: const Icon(Icons.refresh),
                             label: const Text('再試行'),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: loading
-                                ? null
-                                : () async {
-                                    final picked = await ImagePicker().pickImage(
-                                      source: ImageSource.gallery,
-                                      maxWidth: 1600,
-                                      imageQuality: 85,
-                                    );
-                                    if (picked != null) {
-                                      pickedImageBytes = await picked.readAsBytes();
-                                      setState(() { errorMsg = null; });
-                                    }
-                                  },
-                            child: const Text('画像を選び直す'),
                           ),
                         ],
                       ),
@@ -563,9 +457,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
   DateTime at = log.at.toLocal();
   final noteController = TextEditingController(text: log.note ?? '');
   bool loading = false;
-  Uint8List? newImageBytes;
-  bool removePhoto = false;
-  double uploadProgress = 0.0;
+  // Image selection/upload removed
   String? errorMsg;
 
   await showDialog<void>(
@@ -593,31 +485,8 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
 
         Future<void> doUpdate() async {
           if (!formKey.currentState!.validate() || type == null) return;
-          setState(() { loading = true; errorMsg = null; uploadProgress = 0.0; });
+          setState(() { loading = true; errorMsg = null; });
           try {
-            String? photoUrl;
-            bool shouldRemove = removePhoto;
-            if (newImageBytes != null) {
-              if (log.photoUrl != null && log.photoUrl!.isNotEmpty) {
-                try {
-                  await repo.deleteLogPhoto(petId: petId, logId: log.id).timeout(const Duration(seconds: 15));
-                } catch (_) {}
-              }
-              photoUrl = await repo
-                  .uploadLogPhoto(
-                    petId: petId,
-                    logId: log.id,
-                    bytes: newImageBytes!,
-                    onProgress: (p) => setState(() => uploadProgress = p),
-                  )
-                  .timeout(const Duration(seconds: 60));
-              shouldRemove = false;
-            }
-            if (shouldRemove) {
-              try {
-                await repo.deleteLogPhoto(petId: petId, logId: log.id).timeout(const Duration(seconds: 15));
-              } catch (_) {}
-            }
             await repo
                 .updateLog(
                   petId,
@@ -625,8 +494,6 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                   type: type,
                   at: at,
                   note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
-                  photoUrl: photoUrl,
-                  removePhoto: shouldRemove,
                 )
                 .timeout(const Duration(seconds: 15));
             if (dialogContext.mounted) Navigator.of(dialogContext).pop();
@@ -696,64 +563,7 @@ Future<void> _showEditLogDialog(BuildContext context, WidgetRef ref, String petI
                   maxLines: 3,
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: loading
-                          ? null
-                          : () async {
-                              final picked = await ImagePicker().pickImage(
-                                source: ImageSource.gallery,
-                                maxWidth: 1600,
-                                imageQuality: 85,
-                              );
-                              if (picked != null) {
-                                newImageBytes = await picked.readAsBytes();
-                                setState(() => removePhoto = false);
-                              }
-                            },
-                      icon: const Icon(Icons.photo),
-                      label: const Text('画像を選択'),
-                    ),
-                    const SizedBox(width: 12),
-                    if (newImageBytes != null)
-                      SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(newImageBytes!, fit: BoxFit.cover),
-                        ),
-                      )
-                    else if (log.photoUrl != null && log.photoUrl!.isNotEmpty && !removePhoto)
-                      SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(log.photoUrl!, fit: BoxFit.cover),
-                        ),
-                      ),
-                    const Spacer(),
-                    if ((log.photoUrl != null && log.photoUrl!.isNotEmpty) || newImageBytes != null)
-                      TextButton.icon(
-                        onPressed: loading
-                            ? null
-                            : () {
-                                newImageBytes = null;
-                                setState(() => removePhoto = true);
-                              },
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('画像を削除'),
-                      ),
-                  ],
-                ),
-                if (loading && (newImageBytes != null))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: LinearProgressIndicator(value: uploadProgress == 0 ? null : uploadProgress),
-                  ),
+                // Image selection and preview removed
                 if (errorMsg != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
