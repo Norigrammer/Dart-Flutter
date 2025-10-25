@@ -5,9 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'app_router.dart';
 import 'firebase_options.dart';
 
-// TODO: flutterfire configure 実行後に生成されるファイル
-// import 'firebase_options.dart';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: BootstrapApp()));
@@ -47,10 +44,33 @@ class BootstrapApp extends ConsumerWidget {
             debugShowCheckedModeBanner: false,
           );
         }
-        final theme = ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal));
+        final lightColorScheme = ColorScheme.fromSeed(seedColor: Colors.teal);
+        final darkColorScheme = ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark);
+        final lightTheme = ThemeData(
+          colorScheme: lightColorScheme,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFFFFE0B2), // 薄い橙（全画面で共通）
+            foregroundColor: Colors.black87,
+            elevation: 0.5,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Color(0x4D000000), // alpha約0.3の黒
+          ),
+        );
+        final darkTheme = ThemeData(
+          colorScheme: darkColorScheme,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF3A544B), // ダーク時に馴染む深い色
+            foregroundColor: Colors.white,
+            elevation: 0.5,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Color(0x4D000000),
+          ),
+        );
         return MaterialApp.router(
           title: 'ペットケア記録',
-          theme: theme,
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: ThemeMode.system,
           routerConfig: appRouter,
           debugShowCheckedModeBanner: false,
         );

@@ -45,8 +45,24 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(authControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(_isRegisterMode ? 'アカウント登録' : 'サインイン')),
-      body: Center(
+      appBar: AppBar(
+        title: Text(_isRegisterMode ? 'アカウント登録' : 'サインイン'),
+      ),
+      body: Stack(
+        children: [
+          // Background PNG matching HomePage style
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Image.asset(
+                Theme.of(context).brightness == Brightness.dark
+                    ? 'assets/backgrounds/home_bg_dark.png'
+                    : 'assets/backgrounds/home_bg_light.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+          ),
+          Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
@@ -123,6 +139,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             ),
           ),
         ),
+      ),
+        ],
       ),
     );
   }

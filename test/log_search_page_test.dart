@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sample/pages/log_search_page.dart';
 import 'package:sample/models/pet.dart';
+import 'package:sample/data/repositories/care_log_repository.dart';
 
 void main() {
   group('LogSearchPage', () {
@@ -15,8 +17,13 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: LogSearchPage(pet: testPet),
+        ProviderScope(
+          overrides: [
+            petLogsProvider.overrideWith((ref, petId) => Stream.value(const [])),
+          ],
+          child: MaterialApp(
+            home: LogSearchPage(pet: testPet),
+          ),
         ),
       );
 
@@ -34,13 +41,18 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: LogSearchPage(pet: testPet),
+        ProviderScope(
+          overrides: [
+            petLogsProvider.overrideWith((ref, petId) => Stream.value(const [])),
+          ],
+          child: MaterialApp(
+            home: LogSearchPage(pet: testPet),
+          ),
         ),
       );
 
       // Wait for the widget to build
-      await tester.pumpAndSettle();
+  await tester.pumpAndSettle();
 
       // Check that the initial prompt is shown
       expect(find.text('検索ワードを入力してください'), findsOneWidget);
