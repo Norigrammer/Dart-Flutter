@@ -1,4 +1,4 @@
-# ペットケア記録（家族共有）
+# Pettime（名称：ペットタイム）
 
 Flutter + Firebase のスケルトン。Auth（メール/パスワード）、ルーター、Firestore リポジトリ（pets/logs）を含みます。
 
@@ -39,28 +39,42 @@ pets/{petId}
 	name: string
 	members: string[] (UID array)
 	photoUrl?: string
-	createdAt: Timestamp
-	updatedAt: Timestamp
+	# ペットケア記録（Pettime）
 
+	Flutter + Firebase で作る家族向けペットケア記録アプリのサンプル実装です。メール/パスワード認証、ルーティング、Firestore リポジトリ（pets/logs）、Riverpod による状態管理を含みます。
+
+	## 技術スタック
+
+	- Flutter / Dart（Riverpod 3, go_router）
+	- Firebase（Auth, Cloud Firestore）
+	- freezed / json_serializable（モデル＆シリアライズ）
+	- Mermaid（README での構成図表現）
 pets/{petId}/logs/{logId}
 	type: 'walk' | 'feed' | 'clinic'
-	note?: string
+	1) Firebase プロジェクトの紐付け（`firebase_options.dart` 生成）
 	photoUrl?: string
 	at: Timestamp   (記録日時)
 	createdBy: string (UID)
 	createdAt: Timestamp (作成時刻)
 ```
 
-将来的に `users/{uid}` プロファイルや通知設定などを追加予定。
+	実行後、`lib/firebase_options.dart` が生成されます。`main.dart` はこの設定を自動で読み込み、Firebase を初期化します。
 
-## 推奨 Firestore セキュリティルール（例）
+	2) 依存解決と起動
+
 
 以下は概念例です。実運用では追加でバリデーション（配列長・文字数制限など）を行ってください。
 
 ```js
+
+	3) テスト実行（任意）
+
+	```powershell
+	flutter test
+	```
 rules_version = '2';
 service cloud.firestore {
-	match /databases/{database}/documents {
+	## データモデル / Firestore コレクション構造（現状）
 		function isSignedIn() { return request.auth != null; }
 		function uid() { return request.auth.uid; }
 
@@ -70,18 +84,26 @@ service cloud.firestore {
 				request.resource.data.name is string && request.resource.data.members is list;
 			allow update, delete: if isSignedIn() && (uid() in resource.data.members);
 
+	- ホーム（ペット一覧 & 追加ダイアログ）
+		- ローディング表示 / エラー（再試行）/ 空データのガイド表示
+		- 右下の + FAB から名前（必須・30文字以内）を入力して追加
+	- ペット詳細 & ログ管理
+		- ログ一覧（散歩・ごはん・病院）／種類・期間フィルタ
+		- ログの追加・編集・削除
+		- 画像添付は非対応（Storage 非利用方針）
+	- 統計情報
+		- 総記録数・記録期間・各タイプの件数・最終記録日時を表示
+		- データがない場合のガイド表示
+	- 週間サマリー
+		- 過去7日間の概要（タイプ別合計）、日毎カード表示、今日のハイライト
+	- ログ検索
+		- メモ内容を対象にリアルタイム検索、件数表示、結果一覧
+
 			match /logs/{logId} {
 				allow read: if isSignedIn() && (uid() in get(/databases/$(database)/documents/pets/$(petId)).data.members);
 				allow create: if isSignedIn() && (uid() in get(/databases/$(database)/documents/pets/$(petId)).data.members);
-				allow update, delete: if isSignedIn() && (uid() == resource.data.createdBy);
-			}
-		}
-	}
-}
-```
 
 ## インデックス（必要になり得るもの）
-
 - `pets` コレクション: members の array-contains クエリ（自動）
 - `pets/{petId}/logs` コレクション: orderBy at desc + limit（単一フィールドは自動）
 
