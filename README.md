@@ -141,6 +141,86 @@ service cloud.firestore {
 - 検索結果件数の表示
 - 検索にヒットしたログの一覧表示
 
+## 構成図（Flutter + Firebase 連携）
+
+以下は、本アプリが Flutter（UI/状態管理/リポジトリ層）と Firebase（Auth/Firestore）でどのように連携しているかを示す構成図です。
+
+```mermaid
+flowchart LR
+	subgraph App[Flutter App]
+		direction TB
+		R[go_router
+		(画面遷移)]
+		P[Pages
+		(SignIn/Home/
+		PetDetail/
+		WeeklySummary/
+		LogSearch)]
+		S[Riverpod Providers
+		・authStateProvider
+		・authControllerProvider
+		・myPetsStreamProvider
+		・petLogsProvider
+		・petStatisticsProvider]
+		Repo[Repositories
+		・AuthService
+		・PetRepository
+		・CareLogRepository]
+	end
+
+	subgraph Firebase[Firebase]
+		direction TB
+		Auth[Firebase Auth
+		・Email/Password
+		・(Google Sign-In 予定)]
+		FS[Cloud Firestore
+		・pets/{petId}
+		・logs/{logId}]
+		FCM[(FCM 通知 予定)]
+	end
+
+	%% 主要なデータフロー
+	P -->|watch/sign-in 操作| S
+	S -->|依存注入/状態| Repo
+	Repo -->|CRUD/Query| FS
+	Repo -->|signIn/SignOut| Auth
+	FS -->|Stream snapshots| Repo
+	Repo -->|結果を返却| S
+	S -->|AsyncValue をUI反映| P
+	R --> P
+
+	%% 参考: 将来拡張
+	P -. 通知受信 .-> FCM
+```
+
+### 説明
+- Pages: 画面（サインイン/ホーム/詳細/週間サマリー/検索）
+- Providers: Riverpod による状態/非同期データ（Auth 状態、ペット一覧、ログ一覧、統計など）
+- Repositories: Firebase へのアクセスを集約（AuthService, PetRepository, CareLogRepository）
+- Firebase Auth: メール/パスワード（将来的に Google Sign-In 追加）
+- Cloud Firestore: `pets` コレクションと `pets/{petId}/logs` サブコレクション
+- FCM: 通知（今後追加予定）
+
+### データフロー例（ログ表示）
+
+```mermaid
+sequenceDiagram
+	participant User as ユーザー
+	participant Page as HomePage/PetDetail
+	participant Prov as Riverpod Provider
+	participant Repo as CareLogRepository/PetRepository
+	participant FS as Cloud Firestore
+
+	User->>Page: 画面表示
+	Page->>Prov: petLogsProvider / myPetsStreamProvider を watch
+	Prov->>Repo: ログ/ペットの取得を要求
+	Repo->>FS: クエリ（orderBy/where/limit）
+	FS-->>Repo: スナップショット（Stream）
+	Repo-->>Prov: List<モデル> を返却
+	Prov-->>Page: AsyncValue.data(...) で UI 更新
+	Page-->>User: リスト表示/ガイド表示
+```
+
 ## 次のステップ候補
 
 - ~~統計情報画面: ケアログの記録数・最終記録日などの可視化~~ (実装済)
@@ -159,8 +239,6 @@ service cloud.firestore {
 
 - Firestore: `firestore.rules`
 
-Storage は現在使用しません。`storage.rules` は参考用に残っている場合がありますが、デプロイ不要です。
-
 ### デプロイ手順（Firebase CLI）
 
 事前に Firebase CLI ログインとプロジェクト選択を済ませてください。
@@ -169,7 +247,7 @@ Storage は現在使用しません。`storage.rules` は参考用に残って�
 firebase.cmd login --no-localhost
 firebase.cmd use pet-time-7398c
 
-# Firestore ルールのみデプロイ
+# Firestore ルールデプロイ
 firebase.cmd deploy --only firestore:rules
 ```
 
